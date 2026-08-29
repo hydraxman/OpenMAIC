@@ -25,7 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { resolveASRProviderName } from '@/lib/audio/provider-display';
-import { useSettingsStore } from '@/lib/store/settings';
+import { resolveMediaModels, useSettingsStore } from '@/lib/store/settings';
 import { IMAGE_PROVIDERS } from '@/lib/media/image-providers';
 import { VIDEO_PROVIDERS } from '@/lib/media/video-providers';
 import { CUSTOM_ASR_DEFAULT_LANGUAGES } from '@/lib/audio/constants';
@@ -63,17 +63,6 @@ const TABS: Array<{ id: TabId; icon: LucideIcon; label: string }> = [
   { id: 'tts', icon: Volume2, label: 'TTS' },
   { id: 'asr', icon: Mic, label: 'ASR' },
 ];
-
-function providerModels<T extends { id: string; name: string }>(
-  builtInModels: T[],
-  config?: { customModels?: T[]; replaceBuiltInModels?: boolean },
-): T[] {
-  const customModels = config?.customModels || [];
-  if (config?.replaceBuiltInModels && customModels.length > 0) {
-    return customModels;
-  }
-  return [...builtInModels, ...customModels];
-}
 
 export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
   const { t } = useI18n();
@@ -153,7 +142,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
           const items =
             p.id === 'comfyui-image'
               ? comfyWorkflows
-              : providerModels(p.models, imageProvidersConfig[p.id]);
+              : resolveMediaModels(p.models, imageProvidersConfig[p.id]);
 
           return {
             groupId: p.id,
@@ -179,7 +168,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
           groupName: p.name,
           groupIcon: VIDEO_PROVIDER_ICONS[p.id],
           available: true,
-          items: providerModels(p.models, videoProvidersConfig[p.id]).map((m) => ({
+          items: resolveMediaModels(p.models, videoProvidersConfig[p.id]).map((m) => ({
             id: m.id,
             name: m.name,
           })),

@@ -208,8 +208,8 @@ interface MockServerResponse {
   tts?: Record<string, { baseUrl?: string; disabled?: boolean }>;
   asr?: Record<string, { baseUrl?: string; disabled?: boolean }>;
   pdf?: Record<string, { baseUrl?: string }>;
-  image?: Record<string, { baseUrl?: string; disabled?: boolean }>;
-  video?: Record<string, { baseUrl?: string; disabled?: boolean }>;
+  image?: Record<string, { models?: string[]; baseUrl?: string; disabled?: boolean }>;
+  video?: Record<string, { models?: string[]; baseUrl?: string; disabled?: boolean }>;
   webSearch?: Record<string, { baseUrl?: string; disabled?: boolean }>;
 }
 
@@ -1119,6 +1119,42 @@ describe('fetchServerProviders — Image stale selection', () => {
     expect(store.getState().imageModelId).toBe('doubao-seedream-5-0-260128');
   });
 
+  it('applies a custom server image allowlist and repairs the selected model', async () => {
+    const store = await getStore();
+    store.setState({
+      imageProviderId: 'seedream',
+      imageModelId: 'local-image-model',
+      imageProvidersConfig: {
+        ...store.getState().imageProvidersConfig,
+        seedream: {
+          ...store.getState().imageProvidersConfig.seedream,
+          customModels: [{ id: 'local-image-model', name: 'Local Image Model' }],
+          replaceBuiltInModels: true,
+        },
+      },
+    });
+    mockServerResponse({
+      image: { seedream: { models: ['doubao-seedream-5.0-lite', 'managed-image-v2'] } },
+    });
+
+    await store.getState().fetchServerProviders();
+
+    expect(store.getState().imageProvidersConfig.seedream).toMatchObject({
+      serverModels: ['doubao-seedream-5.0-lite', 'managed-image-v2'],
+      customModels: [{ id: 'local-image-model', name: 'Local Image Model' }],
+    });
+    expect(store.getState().imageModelId).toBe('doubao-seedream-5.0-lite');
+
+    mockServerResponse({ image: { seedream: {} } });
+    await store.getState().fetchServerProviders();
+
+    expect(store.getState().imageProvidersConfig.seedream).toMatchObject({
+      serverModels: undefined,
+      customModels: [{ id: 'local-image-model', name: 'Local Image Model' }],
+    });
+    expect(store.getState().imageModelId).toBe('local-image-model');
+  });
+
   it('does not force-enable when provider is already set but generation was disabled', async () => {
     const store = await getStore();
 
@@ -1244,6 +1280,24 @@ describe('fetchServerProviders — Video stale selection', () => {
     expect(store.getState().videoModelId).toBe('doubao-seedance-2-0-260128');
     // Provider recovered but generation stays off — user enables manually
     expect(store.getState().videoGenerationEnabled).toBe(false);
+  });
+
+  it('applies a custom server video allowlist and repairs the selected model', async () => {
+    const store = await getStore();
+    store.setState({
+      videoProviderId: 'seedance',
+      videoModelId: 'doubao-seedance-2-0-260128',
+    });
+    mockServerResponse({
+      video: { seedance: { models: ['managed-video-v2', 'managed-video-v1'] } },
+    });
+
+    await store.getState().fetchServerProviders();
+
+    expect(store.getState().videoProvidersConfig.seedance).toMatchObject({
+      serverModels: ['managed-video-v2', 'managed-video-v1'],
+    });
+    expect(store.getState().videoModelId).toBe('managed-video-v2');
   });
 });
 

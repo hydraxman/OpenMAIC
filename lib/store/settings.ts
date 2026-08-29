@@ -170,6 +170,8 @@ export interface SettingsState {
       serverDisabled?: boolean;
       customModels?: Array<{ id: string; name: string }>;
       replaceBuiltInModels?: boolean;
+      /** Operator-managed allowlist from /api/server-providers, in server order. */
+      serverModels?: string[];
     }
   >;
 
@@ -187,6 +189,8 @@ export interface SettingsState {
       serverDisabled?: boolean;
       customModels?: Array<{ id: string; name: string }>;
       replaceBuiltInModels?: boolean;
+      /** Operator-managed allowlist from /api/server-providers, in server order. */
+      serverModels?: string[];
     }
   >;
 
@@ -455,14 +459,19 @@ function resolveSelectedLLMModel(
   return availableModels[0]?.id ?? '';
 }
 
-function resolveMediaModels<T extends { id: string; name: string }>(
+export function resolveMediaModels<T extends { id: string; name: string }>(
   builtInModels: T[],
-  config?: { customModels?: T[]; replaceBuiltInModels?: boolean },
+  config?: { customModels?: T[]; replaceBuiltInModels?: boolean; serverModels?: string[] },
 ): T[] {
   const customModels = config?.customModels ?? [];
-  return config?.replaceBuiltInModels && customModels.length > 0
-    ? customModels
-    : [...builtInModels, ...customModels];
+  const configuredModels =
+    config?.replaceBuiltInModels && customModels.length > 0
+      ? customModels
+      : [...builtInModels, ...customModels];
+  if (!config?.serverModels?.length) return configuredModels;
+
+  const byId = new Map(configuredModels.map((model) => [model.id, model]));
+  return config.serverModels.map((id) => byId.get(id) ?? ({ id, name: id } as T));
 }
 
 function isUsableMediaProvider(
@@ -1400,7 +1409,7 @@ export const useSettingsStore = create<SettingsState>()(
           try {
             const res = await fetch('/api/server-providers');
             if (!res.ok) return;
-            // Managed providers expose only their allowed model list (LLM/image)
+            // Managed providers expose only their allowed model list (LLM/image/video)
             // and presence (the "managed" flag) — never a base URL. Every
             // capability section carries an optional `disabled` flag for
             // admin/server-level force-off (#665).
@@ -1410,7 +1419,7 @@ export const useSettingsStore = create<SettingsState>()(
               asr: Record<string, { disabled?: boolean }>;
               pdf: Record<string, Record<string, never>>;
               image: Record<string, { models?: string[]; disabled?: boolean }>;
-              video: Record<string, { disabled?: boolean }>;
+              video: Record<string, { models?: string[]; disabled?: boolean }>;
               webSearch: Record<string, { disabled?: boolean }>;
               generation?: { parallelSceneConcurrency?: number };
             };
@@ -1549,6 +1558,7 @@ export const useSettingsStore = create<SettingsState>()(
                     ...newImageConfig[key],
                     isServerConfigured: false,
                     serverDisabled: false,
+                    serverModels: undefined,
                   };
                 }
               }
@@ -1559,6 +1569,7 @@ export const useSettingsStore = create<SettingsState>()(
                     ...newImageConfig[key],
                     isServerConfigured: !info.disabled,
                     serverDisabled: info.disabled === true,
+                    serverModels: info.models?.length ? info.models : undefined,
                   };
                 }
               }
@@ -1574,6 +1585,7 @@ export const useSettingsStore = create<SettingsState>()(
                     ...newVideoConfig[key],
                     isServerConfigured: false,
                     serverDisabled: false,
+                    serverModels: undefined,
                   };
                 }
               }
@@ -1585,6 +1597,7 @@ export const useSettingsStore = create<SettingsState>()(
                       ...newVideoConfig[key],
                       isServerConfigured: !info.disabled,
                       serverDisabled: info.disabled === true,
+                      serverModels: info.models?.length ? info.models : undefined,
                     };
                   }
                 }

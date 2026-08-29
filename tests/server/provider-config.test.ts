@@ -557,6 +557,17 @@ pdf:
       expect(resolveVideoBaseUrl('grok-video')).toBe('https://proxy.example.com/video');
     });
 
+    it('exposes the server video model allowlist without credentials or base URLs', async () => {
+      vi.stubEnv('VIDEO_SEEDANCE_API_KEY', 'sk-seedance');
+      vi.stubEnv('VIDEO_SEEDANCE_BASE_URL', 'https://proxy.example.com/video');
+      vi.stubEnv('VIDEO_SEEDANCE_MODELS', 'managed-v2,managed-v1');
+      const { getServerVideoProviders } = await import('@/lib/server/provider-config');
+
+      expect(getServerVideoProviders().seedance).toEqual({
+        models: ['managed-v2', 'managed-v1'],
+      });
+    });
+
     it('activates keyless image providers (lemonade) from a base URL alone', async () => {
       vi.stubEnv('IMAGE_LEMONADE_BASE_URL', 'http://localhost:13305/v1');
       const { getServerImageProviders, resolveImageApiKey, isServerConfiguredProvider } =
